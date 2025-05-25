@@ -1,5 +1,6 @@
 # Object-oriented-Programming_Project
   1. Realizacja animowanej wizualizacji ramienia robota
+
 Zrealizować sterowalną przez użytkownika wizualizację wybranego ramienia robota (przykłady ramion
 poniżej).Wizualizowane ramię (zwane dalej również modelem) musi posiadać co najmniej 3 stopnie swobody
 (wizualizacja manipulatora nie jest konieczna ani nie jest wliczana do stopni swobody). Ruchy elementów
