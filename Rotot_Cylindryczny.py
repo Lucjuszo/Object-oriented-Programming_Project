@@ -1,7 +1,6 @@
 from vpython import *
 import math
 
-# Scena
 scene.title = "Robot cylindryczny"
 scene.caption = """Sterowanie:
 ← / → : obrót
@@ -14,131 +13,116 @@ scene.height = 600
 scene.background = color.white
 scene.range = 5
 
-# Parametry
-theta = 0         # obrót wokół osi Z
-z_pos = 1         # pozycja góra/dół
-r = 2             # promień ramienia
-grabbing = False
 
-# Podstawa
-base = cylinder(pos=vector(0, 0, 0), axis=vector(0, 0.1, 0), radius=1.5, color=color.gray(0.5))
+class TargetObject:
+    def __init__(self):
+        self.body = box(pos=vector(3, 0.2, 0), size=vector(0.4, 0.4, 0.4), color=color.green)
 
-# Część poruszająca się w górę
-vertical = cylinder(pos=vector(0, z_pos, 0), axis=vector(0, 5, 0), radius=1, color=color.blue)
+    def set_position(self, pos):
+        self.body.pos = pos
 
-# Ramię poziome
-arm = box(pos=vector(r, z_pos + 0.5, 0), size=vector(2, 0.2, 0.2), color=color.orange)
-
-# Końcówka
-# Szczęki chwytaka
-jaw_gap = 0.15  # odległość szczęk od osi
-jaw_size = vector(0.2, 1, 0.004)
-
-jaw_left = box(pos=vector(0, 0, 0), size=jaw_size, color=color.red)
-jaw_right = box(pos=vector(0, 0, 0), size=jaw_size, color=color.red)
+    def get_position(self):
+        return self.body.pos
 
 
-# Obiekt do złapania
-target = box(pos=vector(3, 0.2, 0), size=vector(0.4, 0.4, 0.4), color=color.green)
+class CylindricalRobot:
+    def __init__(self, target):
+        self.theta = 0
+        self.z_pos = 0.1
+        self.r = 2
+        self.jaw_gap = 0.3
+        self.grabbing = False
+        self.target = target
+
+        # Części robota
+        self.base = cylinder(pos=vector(0, 0, 0), axis=vector(0, 0.1, 0), radius=1.5, color=color.gray(0.5))
+        self.stem = cylinder(pos=vector(0, 0, 0), axis=vector(0, 5, 0), radius=1, color=color.blue)
+        self.rotating_plate = box(pos=vector(0, self.z_pos + 0.5, 0), size=vector(0.5, 2.5, 2.5), color=color.yellow)
+        self.arm = box(pos=vector(self.r, self.z_pos + 0.5, 0), size=vector(2, 0.2, 0.2), color=color.orange)
+
+        # Chwytak
+        self.gripper_base = box(pos=vector(0, 0, 0), size=vector(0.1, 0.1, 1), color=color.green)
+        self.jaw_size = vector(0.2, 0.5, 0.01)
+        self.jaw_left = box(pos=vector(0, 0, 0), size=self.jaw_size, color=color.red)
+        self.jaw_right = box(pos=vector(0, 0, 0), size=self.jaw_size, color=color.red)
+
+    def update(self):
+        self.arm.pos = vector(self.r * math.cos(self.theta), self.z_pos + 0.5, self.r * math.sin(self.theta))
+        self.arm.axis = vector(math.cos(self.theta), 0, math.sin(self.theta)) * 2
+
+        self.rotating_plate.pos = vector(0, self.z_pos + 0.5, 0)
+        self.rotating_plate.up = vector(math.cos(self.theta), 0, math.sin(self.theta))
+
+        end_pos = self.arm.pos + norm(self.arm.axis)
+        side = cross(self.arm.axis, vector(0, 1, 0))
+        side_norm = norm(side)
+
+        grip_center = end_pos
+
+        self.gripper_base.pos = grip_center
+        self.gripper_base.axis = vector(math.cos(self.theta), 0, math.sin(self.theta)) / 10
+
+        self.jaw_left.pos = grip_center + side_norm * (self.jaw_gap / 2)
+        self.jaw_right.pos = grip_center - side_norm * (self.jaw_gap / 2)
+        self.jaw_left.axis = norm(self.arm.axis)
+        self.jaw_right.axis = norm(self.arm.axis)
+
+        if self.grabbing:
+            self.target.set_position((self.jaw_left.pos + self.jaw_right.pos) / 2)
+
+    def animate_grip(self, target_gap, step=0.01):
+        while abs(self.jaw_gap - target_gap) > 0.01:
+            self.jaw_gap += step if self.jaw_gap < target_gap else -step
+            self.update()
+            rate(60)
+
+    def grab_or_release(self):
+        jaw_vec = self.jaw_right.pos - self.jaw_left.pos
+        jaw_dir = norm(jaw_vec)
+        jaw_len = mag(jaw_vec)
+
+        obj_vec = self.target.get_position() - self.jaw_left.pos
+        proj_len = dot(obj_vec, jaw_dir)
+        perp_dist = mag(obj_vec - proj_len * jaw_dir)
+
+        if not self.grabbing and 0 < proj_len < jaw_len and perp_dist < 0.2:
+            self.grabbing = True
+            self.animate_grip(0.05)
+        else:
+            self.grabbing = False
+            self.animate_grip(0.2)
+
+    def handle_input(self, key):
+        if key == 'left': self.theta -= 0.1
+        elif key == 'right': self.theta += 0.1
+        elif key == 'up': self.z_pos += 0.1
+        elif key == 'down': self.z_pos -= 0.1
+        elif key == 'w': self.r += 0.1
+        elif key == 's': self.r -= 0.1
+        elif key == ' ': self.grab_or_release()
+
+        # Ograniczenia
+        self.z_pos = max(0, min(self.z_pos, 4))
+        self.r = max(0.5, min(self.r, 4))
+        if self.theta > 2 * math.pi: self.theta -= 2 * math.pi
+        if self.theta < 0: self.theta += 2 * math.pi
+
+
+# Inicjalizacja
+target = TargetObject()
+robot = CylindricalRobot(target)
 
 # Podłoga
 floor = box(pos=vector(0, -1.5, 0), size=vector(100, 3, 100), color=color.gray(0.9))
 
-def update_robot():
-    global arm, jaw_left, jaw_right
 
-    # Pozycja pionowa
-    vertical.pos = vector(0, z_pos, 0)
-
-    # Pozycja i orientacja ramienia
-    arm.pos = vector(r * math.cos(theta), z_pos + 0.5, r * math.sin(theta))
-    arm.axis = vector(math.cos(theta), 0, math.sin(theta)) * 2
-
-    # Pozycja końca ramienia (punkt wyjściowy dla chwytaka)
-    end_pos = arm.pos + norm(arm.axis)
-
-    # Wektor prostopadły do ramienia (dla szczęk)
-    side = cross(arm.axis, vector(0, 1, 0))  # prostopadły wektor do ramienia
-
-    # Środek między szczękami (punkt końca ramienia)
-    grip_center = end_pos
-    side_norm = norm(side)
-
-    # Lewa i prawa szczęka po przeciwnych stronach środka
-    jaw_left.pos = grip_center + side_norm * (jaw_gap / 2)
-    jaw_right.pos = grip_center - side_norm * (jaw_gap / 2)
-
-    # Ustawienie osi szczęk wzdłuż osi pionowej (ew. zmień wg potrzeby)
-    jaw_left.axis = norm(arm.axis)
-    jaw_right.axis = norm(arm.axis)
-
-def animate_grip(target_gap, step=0.01):
-    global jaw_gap
-    while abs(jaw_gap - target_gap) > 0.01:
-        jaw_gap += step if jaw_gap < target_gap else -step
-        update_robot()
-        rate(60)
+def on_key(evt):
+    robot.handle_input(evt.key)
 
 
-def grab_release():
-    global grabbing, jaw_gap
-
-    # Wektor między szczękami
-    jaw_vec = jaw_right.pos - jaw_left.pos
-    jaw_dir = norm(jaw_vec)
-    jaw_len = mag(jaw_vec)
-
-    # Wektor od lewej szczęki do obiektu
-    obj_vec = target.pos - jaw_left.pos
-
-    # Projekcja wektora obiektu na linię szczęk
-    proj_len = dot(obj_vec, jaw_dir)
-
-    # Odległość od osi szczęk (czyli jak bardzo obiekt "odbiega" od tej linii)
-    perp_dist = mag(obj_vec - proj_len * jaw_dir)
-
-    # Warunki: obiekt mieści się między szczękami i jest blisko ich osi
-    if not grabbing and 0 < proj_len < jaw_len and perp_dist < 0.2:
-        grabbing = True
-        jaw_gap = 0.05
-    else:
-        grabbing = False
-        jaw_gap = 0.2
-
-
-
-
-
-def move_target():
-    if grabbing:
-        # Umieszczamy obiekt między szczękami
-        target.pos = (jaw_left.pos + jaw_right.pos) / 2
-
-
-# Obsługa klawiatury
-def key_input(evt):
-    global theta, z_pos, r
-    s = evt.key
-    if s == 'left': theta -= 0.1
-    elif s == 'right': theta += 0.1
-    elif s == 'up': z_pos += 0.1
-    elif s == 'down': z_pos -= 0.1
-    elif s == 'w': r += 0.1
-    elif s == 's': r -= 0.1
-    elif s == ' ': grab_release()
-
-    # Ograniczenia
-    if z_pos < 0: z_pos = 0
-    if r < 0.5: r = 0.5
-    if r > 4: r = 4
-    if z_pos > 4: z_pos = 4
-    if theta > 2 * math.pi: theta -= 2 * math.pi
-    if theta < 0: theta += 2 * math.pi
-
-scene.bind('keydown', key_input)
+scene.bind('keydown', on_key)
 
 # Pętla główna
 while True:
     rate(60)
-    update_robot()
-    move_target()
+    robot.update()
