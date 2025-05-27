@@ -16,7 +16,7 @@ scene.range = 5
 
 class TargetObject:
     def __init__(self):
-        self.body = box(pos=vector(3, 0.2, 0), size=vector(0.4, 0.4, 0.4), color=color.green)
+        self.body = box(pos=vector(0, 0.2, 2), size=vector(0.4, 0.4, 0.4), color=color.red)
 
     def set_position(self, pos):
         self.body.pos = pos
@@ -35,37 +35,35 @@ class CylindricalRobot:
         self.target = target
 
         # Części robota
-        self.base = cylinder(pos=vector(0, 0, 0), axis=vector(0, 0.1, 0), radius=1.5, color=color.gray(0.5))
-        self.stem = cylinder(pos=vector(0, 0, 0), axis=vector(0, 5, 0), radius=1, color=color.blue)
-        self.rotating_plate = box(pos=vector(0, self.z_pos + 0.5, 0), size=vector(0.5, 2.5, 2.5), color=color.yellow)
-        self.arm = box(pos=vector(self.r, self.z_pos + 0.5, 0), size=vector(2, 0.2, 0.2), color=color.orange)
+        self.base = cylinder(pos=vector(0, 0, 0), axis=vector(0, 0.1, 0), radius=1.5, color=color.blue)
+        self.stem = cylinder(pos=vector(0, 0, 0), axis=vector(0, 5, 0), radius=0.7, color=color.gray(0.8))
+        self.rotating_plate = box(pos=vector(0, self.z_pos + 0.5, 0), size=vector(0.5, 2.5, 2.5), color=color.gray(0.3))
+        self.arm = box(pos=vector(self.r, self.z_pos + 0.5, 0), size=vector(0.2, 2.5, 0.2), color=color.white)
 
         # Chwytak
-        self.gripper_base = box(pos=vector(0, 0, 0), size=vector(0.1, 0.1, 1), color=color.green)
-        self.jaw_size = vector(0.2, 0.5, 0.01)
-        self.jaw_left = box(pos=vector(0, 0, 0), size=self.jaw_size, color=color.red)
-        self.jaw_right = box(pos=vector(0, 0, 0), size=self.jaw_size, color=color.red)
+        self.gripper_base = box(pos=vector(0, 0, 0), size=vector(0.1, 0.1, 1), color=color.black)
+        self.jaw_left = box(pos=vector(0, 0, 0), size=vector(0.35, 0.5, 0.02), color=color.black)
+        self.jaw_right = box(pos=vector(0, 0, 0), size=vector(0.35, 0.5, 0.02), color=color.black)
 
     def update(self):
         self.arm.pos = vector(self.r * math.cos(self.theta), self.z_pos + 0.5, self.r * math.sin(self.theta))
-        self.arm.axis = vector(math.cos(self.theta), 0, math.sin(self.theta)) * 2
+        self.arm.up = vector(math.cos(self.theta), 0, math.sin(self.theta))
+        #self.arm.axis = vector(math.cos(self.theta), 0, math.sin(self.theta)) * 2.5
 
         self.rotating_plate.pos = vector(0, self.z_pos + 0.5, 0)
         self.rotating_plate.up = vector(math.cos(self.theta), 0, math.sin(self.theta))
 
-        end_pos = self.arm.pos + norm(self.arm.axis)
-        side = cross(self.arm.axis, vector(0, 1, 0))
+        grip_center = self.arm.pos + self.arm.up * (self.arm.size.y - self.gripper_base.size.y) / 2
+        side = cross(self.arm.up, vector(0, 1, 0))
         side_norm = norm(side)
 
-        grip_center = end_pos
-
         self.gripper_base.pos = grip_center
-        self.gripper_base.axis = vector(math.cos(self.theta), 0, math.sin(self.theta)) / 10
+        self.gripper_base.up = vector(math.cos(self.theta), 0, math.sin(self.theta)) 
 
-        self.jaw_left.pos = grip_center + side_norm * (self.jaw_gap / 2)
-        self.jaw_right.pos = grip_center - side_norm * (self.jaw_gap / 2)
-        self.jaw_left.axis = norm(self.arm.axis)
-        self.jaw_right.axis = norm(self.arm.axis)
+        self.jaw_left.pos = self.arm.pos + self.arm.up * (self.arm.size.y / 2 - self.gripper_base.size.y + self.jaw_left.size.y / 2) + side_norm * (self.jaw_gap / 2)
+        self.jaw_right.pos = self.arm.pos + self.arm.up * (self.arm.size.y / 2 - self.gripper_base.size.y + self.jaw_left.size.y / 2) - side_norm * (self.jaw_gap / 2)
+        self.jaw_left.up = norm(self.arm.up)
+        self.jaw_right.up = norm(self.arm.up)
 
         if self.grabbing:
             self.target.set_position((self.jaw_left.pos + self.jaw_right.pos) / 2)
@@ -103,9 +101,9 @@ class CylindricalRobot:
 
         # Ograniczenia
         self.z_pos = max(0, min(self.z_pos, 4))
-        self.r = max(0.5, min(self.r, 4))
-        if self.theta > 2 * math.pi: self.theta -= 2 * math.pi
-        if self.theta < 0: self.theta += 2 * math.pi
+        self.r = max(0.5, min(self.r, 2.5))
+        self.theta = max(0, min(self.theta, 1.8 * math.pi))
+
 
 
 # Inicjalizacja
@@ -113,7 +111,7 @@ target = TargetObject()
 robot = CylindricalRobot(target)
 
 # Podłoga
-floor = box(pos=vector(0, -1.5, 0), size=vector(100, 3, 100), color=color.gray(0.9))
+floor = box(pos=vector(0, -1.5, 0), size=vector(100, 3, 100), color=color.green)
 
 
 def on_key(evt):
