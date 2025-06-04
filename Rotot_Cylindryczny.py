@@ -1,5 +1,6 @@
 from vpython import *
 import math
+import time
 
 scene.title = "Robot cylindryczny"
 scene.caption = """Sterowanie:
@@ -33,6 +34,7 @@ class CylindricalRobot:
         self.jaw_gap = 0.3
         self.grabbing = False
         self.target = target
+        self.input_field = None
 
         # Części robota
         self.base = cylinder(pos=vector(0, 0, 0), axis=vector(0, 0.1, 0), radius=1.5, color=color.blue)
@@ -99,12 +101,55 @@ class CylindricalRobot:
         elif key == 's': self.r -= 0.1
         elif key == ' ': self.grab_or_release()
 
+    
+
         # Ograniczenia
         self.z_pos = max(0, min(self.z_pos, 4))
         self.r = max(0.5, min(self.r, 2.5))
         self.theta = max(0, min(self.theta, 1.8 * math.pi))
 
+        # okienko do wprowadzania danych
+    def pos_input(self):
+        if self.input_field is None:
+            scene.append_to_caption("Wprowadź pozycję (np. 1.1 2.0 3.5):")
+            self.input_field = winput(prompt='Podaj pozycję:', bind=self.get_position, type='string')
+            print("Yshoho") #test
 
+        #idz do pozycji po wpisaniu w okienko
+    def get_position(self, text):
+        try:
+            
+            x, y, new_z_pos = map(float, self.input_field.text.split())#zamien string na 3 floaty
+            new_theta = math.atan2(y, x) #kąt theta
+            new_r = sqrt(math.pow(x, 2) + math.pow(y, 2)) #promien
+            if (new_z_pos > 0 and new_z_pos < 4) and (new_theta > 0 and new_theta < 1.8 * math.pi) and (new_r > 0.5 and new_r < 2.5):
+                while(new_z_pos > self.z_pos):
+                    self.z_pos += 0.1
+                    time.sleep(0.1)
+
+                while(new_z_pos < self.z_pos):
+                    self.z_pos -= 0.1
+                    time.sleep(0.1)
+
+                while(new_theta > self.theta):
+                    self.theta += 0.1
+                    time.sleep(0.1)
+
+                while(new_theta < self.theta):
+                    self.theta -= 0.1
+                    time.sleep(0.1)
+
+                while(new_r > self.r):
+                    self.r += 0.1
+                    time.sleep(0.1)
+
+                while(new_r < self.r):
+                    self.r -= 0.1
+                    time.sleep(0.1)
+            else:
+                print("Wspolrzedne poza obszarem pracy")
+        except:
+            print("Błąd: podaj 3 liczby oddzielone spacjami.")
 
 # Inicjalizacja
 target = TargetObject()
@@ -117,7 +162,7 @@ floor = box(pos=vector(0, -1.5, 0), size=vector(100, 3, 100), color=color.green)
 def on_key(evt):
     robot.handle_input(evt.key)
 
-
+robot.pos_input()
 scene.bind('keydown', on_key)
 
 # Pętla główna
