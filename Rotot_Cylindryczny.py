@@ -7,7 +7,8 @@ scene.caption = """Sterowanie:
 ← / → : obrót
 ↑ / ↓ : góra/dół
 W / S : promień ramienia
-Spacja: chwyć / puść
+Z : chwyć
+P : puść
 """
 scene.width = 800
 scene.height = 600
@@ -18,7 +19,7 @@ velocity = 0.07
 
 class TargetObject:
     def __init__(self):
-        self.body = box(pos=vector(0, 0.2, 2), size=vector(0.4, 0.4, 0.4), color=color.red)
+        self.body = sphere(pos=vector(0, 0.2, 3), radius=0.2, color=color.red)
 
     def set_position(self, pos):
         self.body.pos = pos
@@ -26,13 +27,13 @@ class TargetObject:
     def get_position(self):
         return self.body.pos
 
-
 class CylindricalRobot:
     def __init__(self, target):
         self.theta = 0
         self.z_pos = 0.1
         self.r = 2
-        self.jaw_gap = 0.3
+        self.jaw_gap_max = 1
+        self.jaw_gap = 1
         self.grabbing = False
         self.target = target
         self.input_field = None
@@ -51,7 +52,6 @@ class CylindricalRobot:
     def update(self):
         self.arm.pos = vector(self.r * math.cos(self.theta), self.z_pos + 0.5, self.r * math.sin(self.theta))
         self.arm.up = vector(math.cos(self.theta), 0, math.sin(self.theta))
-        #self.arm.axis = vector(math.cos(self.theta), 0, math.sin(self.theta)) * 2.5
 
         self.rotating_plate.pos = vector(0, self.z_pos + 0.5, 0)
         self.rotating_plate.up = vector(math.cos(self.theta), 0, math.sin(self.theta))
@@ -61,7 +61,7 @@ class CylindricalRobot:
         side_norm = norm(side)
 
         self.gripper_base.pos = grip_center
-        self.gripper_base.up = vector(math.cos(self.theta), 0, math.sin(self.theta)) 
+        self.gripper_base.up = vector(math.cos(self.theta), 0, math.sin(self.theta))
 
         self.jaw_left.pos = self.arm.pos + self.arm.up * (self.arm.size.y / 2 - self.gripper_base.size.y + self.jaw_left.size.y / 2) + side_norm * (self.jaw_gap / 2)
         self.jaw_right.pos = self.arm.pos + self.arm.up * (self.arm.size.y / 2 - self.gripper_base.size.y + self.jaw_left.size.y / 2) - side_norm * (self.jaw_gap / 2)
@@ -69,7 +69,9 @@ class CylindricalRobot:
         self.jaw_right.up = norm(self.arm.up)
 
         if self.grabbing:
-            self.target.set_position((self.jaw_left.pos + self.jaw_right.pos) / 2)
+            # Ustaw pozycję przedmiotu na środku między szczękami
+            new_pos = (self.jaw_left.pos + self.jaw_right.pos) / 2
+            self.target.set_position(new_pos)
 
     def animate_grip(self, target_gap, step=0.01):
         while abs(self.jaw_gap - target_gap) > 0.01:
@@ -77,80 +79,132 @@ class CylindricalRobot:
             self.update()
             rate(60)
 
-    def grab_or_release(self):
+    def close_gripper(self):
+        # Animacja zaciskania szczęk
+        print("Zamykanie szczęk...")
+        self.animate_grip(0.05)  # zamknięcie do bardzo małego rozwarcia
+        # Sprawdź, czy przedmiot jest pomiędzy szczękami - kryterium odległości
         jaw_vec = self.jaw_right.pos - self.jaw_left.pos
         jaw_dir = norm(jaw_vec)
         jaw_len = mag(jaw_vec)
-
         obj_vec = self.target.get_position() - self.jaw_left.pos
         proj_len = dot(obj_vec, jaw_dir)
         perp_dist = mag(obj_vec - proj_len * jaw_dir)
-
-        if not self.grabbing and 0 < proj_len < jaw_len and perp_dist < 0.2:
+        if 0 <= proj_len <= jaw_len and perp_dist < 0.15:
             self.grabbing = True
-            self.animate_grip(0.05)
+            print("Przedmiot został chwycony")
         else:
             self.grabbing = False
-            self.animate_grip(0.2)
+            print("Brak przedmiotu między szczękami")
+    def open_gripper(self):
+        # Animacja otwierania szczęk i zwolnienie chwytu
+        print("Otwieranie szczęk...")
+        self.animate_grip(self.jaw_max_gap)
+        self.grabbing = False
+        print("Przedmiot puszczony")
+
+    def check_collision_with_sphere(self, position):
+        # Sprawdź odległość punktu ramienia od kuli (targetu)
+        sphere_pos = self.target.get_position()
+        sphere_radius = self.target.body.radius
+
+        dist = mag(position - sphere_pos)
+        # Margines bezpieczeństwa (np. promień ramienia + chwytaka)
+        safety_distance = sphere_radius + 0.105  # dostosuj wartość 0.5 w razie potrzeby
+        return dist < safety_distance
 
     def handle_input(self, key):
-        if key == 'left': self.theta -= 0.04
-        elif key == 'right': self.theta += 0.04
-        elif key == 'up': self.z_pos += 0.04
-        elif key == 'down': self.z_pos -= 0.04
-        elif key == 'w': self.r += 0.04
-        elif key == 's': self.r -= 0.04
-        elif key == ' ': self.grab_or_release()
+        # Zachowaj kopię bieżących parametrów
+        new_theta = self.theta
+        new_z_pos = self.z_pos
+        new_r = self.r
 
-    
+        if key == 'left': new_theta -= 0.02
+        elif key == 'right': new_theta += 0.02
+        elif key == 'up': new_z_pos += 0.02
+        elif key == 'down': new_z_pos -= 0.02
+        elif key == 'w': new_r += 0.02
+        elif key == 's': new_r -= 0.02
+        elif key == 'z': self.close_gripper()  # zaciskaj szczęki
+        elif key == 'p': self.open_gripper()   # otwieraj szczęki
 
-        # Ograniczenia
-        self.z_pos = max(0, min(self.z_pos, 4))
-        self.r = max(0.5, min(self.r, 2.5))
-        self.theta = max(0, min(self.theta, 1.8 * math.pi))
+        # Ograniczenia parametrów
+        new_z_pos = max(0, min(new_z_pos, 4))
+        new_r = max(0.5, min(new_r, 2.5))
+        new_theta = max(0, min(new_theta, 1.8 * math.pi))
 
-        # okienko do wprowadzania danych
+        # Oblicz pozycję ramienia po zmianie
+        new_arm_pos = vector(new_r * math.cos(new_theta), new_z_pos + 0.5, new_r * math.sin(new_theta))
+
+        # Sprawdź kolizję, jeśli kolizji nie ma, zaakceptuj zmiany
+        if not self.check_collision_with_sphere(new_arm_pos):
+            self.theta = new_theta
+            self.z_pos = new_z_pos
+            self.r = new_r
+        else:
+            # Drukuj komunikat o kolizji lub ignoruj
+            pass
+            # print("Kolizja z kulą - ruch zablokowany")
+
+    # okienko do wprowadzania danych
     def pos_input(self):
         if self.input_field is None:
             scene.append_to_caption("Wprowadź pozycję (np. 1.1 2.0 3.5):")
             self.input_field = winput(prompt='Podaj pozycję:', bind=self.get_position, type='string')
-            print("Yshoho") #test
 
-        #idz do pozycji po wpisaniu w okienko
+    # idź do pozycji po wpisaniu w okienko
     def get_position(self, text):
         try:
-            
-            x, y, new_z_pos = map(float, self.input_field.text.split())#zamien string na 3 floaty
-            new_theta = math.atan2(y, x) #kąt theta
-            new_r = sqrt(math.pow(x, 2) + math.pow(y, 2)) #promien
-            if (new_z_pos > 0 and new_z_pos < 4) and (new_theta > 0 and new_theta < 1.8 * math.pi) and (new_r > 0.5 and new_r < 2.5):
-                while(new_z_pos > self.z_pos):
-                    self.z_pos += 0.04
+            x, y, new_z_pos = map(float, self.input_field.text.split())  # zamien string na 3 floaty
+            new_theta = math.atan2(y, x)  # kąt theta
+            new_r = sqrt(x ** 2 + y ** 2)  # promień
+            if (0 < new_z_pos < 4) and (0 < new_theta < 1.8 * math.pi) and (0.5 < new_r < 2.5):
+                ## Sprawdź kolizję na końcową pozycję
+                #new_arm_pos = vector(new_r * math.cos(new_theta), new_z_pos + 0.5, new_r * math.sin(new_theta))
+                #if self.check_collision_with_sphere(new_arm_pos):
+                #    print("Pozycja w kolizji z kulą - ruch zablokowany")
+                #    return
+
+                while new_z_pos > self.z_pos:
+                    self.z_pos += 0.02
+                    self.update()
+                    rate(60)
                     time.sleep(velocity)
 
-                while(new_z_pos < self.z_pos):
-                    self.z_pos -= 0.04
+                while new_z_pos < self.z_pos:
+                    self.z_pos -= 0.02
+                    self.update()
+                    rate(60)
                     time.sleep(velocity)
 
-                while(new_theta > self.theta):
-                    self.theta += 0.04
+                while new_theta > self.theta:
+                    self.theta += 0.02
+                    self.update()
+                    rate(60)
                     time.sleep(velocity)
 
-                while(new_theta < self.theta):
-                    self.theta -= 0.04
+                while new_theta < self.theta:
+                    self.theta -= 0.02
+                    self.update()
+                    rate(60)
                     time.sleep(velocity)
 
-                while(new_r > self.r):
-                    self.r += 0.04
+                while new_r > self.r:
+                    self.r += 0.02
+                    self.update()
+                    rate(60)
                     time.sleep(velocity)
 
-                while(new_r < self.r):
-                    self.r -= 0.04
+                while new_r < self.r:
+                    self.r -= 0.02
+                    self.update()
+                    rate(60)
                     time.sleep(velocity)
             else:
-                print("Wspolrzedne poza obszarem pracy")
+                print("Współrzędne poza obszarem pracy")
         except:
             print("Błąd: podaj 3 liczby oddzielone spacjami.")
+
 
 # Inicjalizacja
 target = TargetObject()
@@ -158,7 +212,6 @@ robot = CylindricalRobot(target)
 
 # Podłoga
 floor = box(pos=vector(0, -1.5, 0), size=vector(100, 3, 100), color=color.green)
-
 
 def on_key(evt):
     robot.handle_input(evt.key)
@@ -170,3 +223,4 @@ scene.bind('keydown', on_key)
 while True:
     rate(60)
     robot.update()
+
