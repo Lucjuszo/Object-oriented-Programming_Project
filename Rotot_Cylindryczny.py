@@ -14,6 +14,7 @@ scene.height = 600
 scene.background = color.white
 scene.range = 5
 
+velocity = 0.07
 
 class TargetObject:
     def __init__(self):
@@ -93,12 +94,12 @@ class CylindricalRobot:
             self.animate_grip(0.2)
 
     def handle_input(self, key):
-        if key == 'left': self.theta -= 0.1
-        elif key == 'right': self.theta += 0.1
-        elif key == 'up': self.z_pos += 0.1
-        elif key == 'down': self.z_pos -= 0.1
-        elif key == 'w': self.r += 0.1
-        elif key == 's': self.r -= 0.1
+        if key == 'left': self.theta -= 0.04
+        elif key == 'right': self.theta += 0.04
+        elif key == 'up': self.z_pos += 0.04
+        elif key == 'down': self.z_pos -= 0.04
+        elif key == 'w': self.r += 0.04
+        elif key == 's': self.r -= 0.04
         elif key == ' ': self.grab_or_release()
 
     
@@ -124,28 +125,28 @@ class CylindricalRobot:
             new_r = sqrt(math.pow(x, 2) + math.pow(y, 2)) #promien
             if (new_z_pos > 0 and new_z_pos < 4) and (new_theta > 0 and new_theta < 1.8 * math.pi) and (new_r > 0.5 and new_r < 2.5):
                 while(new_z_pos > self.z_pos):
-                    self.z_pos += 0.1
-                    time.sleep(0.1)
+                    self.z_pos += 0.04
+                    time.sleep(velocity)
 
                 while(new_z_pos < self.z_pos):
-                    self.z_pos -= 0.1
-                    time.sleep(0.1)
+                    self.z_pos -= 0.04
+                    time.sleep(velocity)
 
                 while(new_theta > self.theta):
-                    self.theta += 0.1
-                    time.sleep(0.1)
+                    self.theta += 0.04
+                    time.sleep(velocity)
 
                 while(new_theta < self.theta):
-                    self.theta -= 0.1
-                    time.sleep(0.1)
+                    self.theta -= 0.04
+                    time.sleep(velocity)
 
                 while(new_r > self.r):
-                    self.r += 0.1
-                    time.sleep(0.1)
+                    self.r += 0.04
+                    time.sleep(velocity)
 
                 while(new_r < self.r):
-                    self.r -= 0.1
-                    time.sleep(0.1)
+                    self.r -= 0.04
+                    time.sleep(velocity)
             else:
                 print("Wspolrzedne poza obszarem pracy")
         except:
