@@ -32,7 +32,7 @@ class CylindricalRobot:
         self.theta = 0
         self.z_pos = 0.1
         self.r = 2
-        self.jaw_gap_max = 1
+        self.jaw_max_gap = 1
         self.jaw_gap = 1
         self.grabbing = False
         self.target = target
@@ -73,17 +73,18 @@ class CylindricalRobot:
             new_pos = (self.jaw_left.pos + self.jaw_right.pos) / 2
             self.target.set_position(new_pos)
 
-    def animate_grip(self, target_gap, step=0.01):
-        while abs(self.jaw_gap - target_gap) > 0.01:
-            self.jaw_gap += step if self.jaw_gap < target_gap else -step
-            self.update()
+    def animate_grip(self, target_gap, step=0.02):
+        # Animate jaw_gap smoothly to target_gap without blocking event loop or using time.sleep
+        while abs(self.jaw_gap - target_gap) > 0.005:
             rate(60)
+            if self.jaw_gap < target_gap:
+                self.jaw_gap = min(self.jaw_gap + step, target_gap)
+            else:
+                self.jaw_gap = max(self.jaw_gap - step, target_gap)
+            self.update()
 
     def close_gripper(self):
-        # Animacja zaciskania szczęk
-        print("Zamykanie szczęk...")
-        self.animate_grip(0.05)  # zamknięcie do bardzo małego rozwarcia
-        # Sprawdź, czy przedmiot jest pomiędzy szczękami - kryterium odległości
+        self.animate_grip(0.05)  # Close jaws tightly
         jaw_vec = self.jaw_right.pos - self.jaw_left.pos
         jaw_dir = norm(jaw_vec)
         jaw_len = mag(jaw_vec)
@@ -92,16 +93,11 @@ class CylindricalRobot:
         perp_dist = mag(obj_vec - proj_len * jaw_dir)
         if 0 <= proj_len <= jaw_len and perp_dist < 0.15:
             self.grabbing = True
-            print("Przedmiot został chwycony")
         else:
             self.grabbing = False
-            print("Brak przedmiotu między szczękami")
     def open_gripper(self):
-        # Animacja otwierania szczęk i zwolnienie chwytu
-        print("Otwieranie szczęk...")
         self.animate_grip(self.jaw_max_gap)
         self.grabbing = False
-        print("Przedmiot puszczony")
 
     def check_collision_with_sphere(self, position):
         # Sprawdź odległość punktu ramienia od kuli (targetu)
@@ -131,7 +127,7 @@ class CylindricalRobot:
         # Ograniczenia parametrów
         new_z_pos = max(0, min(new_z_pos, 4))
         new_r = max(0.5, min(new_r, 2.5))
-        new_theta = max(0, min(new_theta, 1.8 * math.pi))
+        new_theta = max(-0.9 * math.pi, min(new_theta, 0.9 * math.pi))
 
         # Oblicz pozycję ramienia po zmianie
         new_arm_pos = vector(new_r * math.cos(new_theta), new_z_pos + 0.5, new_r * math.sin(new_theta))
@@ -158,7 +154,7 @@ class CylindricalRobot:
             x, y, new_z_pos = map(float, self.input_field.text.split())  # zamien string na 3 floaty
             new_theta = math.atan2(y, x)  # kąt theta
             new_r = sqrt(x ** 2 + y ** 2)  # promień
-            if (0 < new_z_pos < 4) and (0 < new_theta < 1.8 * math.pi) and (0.5 < new_r < 2.5):
+            if (0 < new_z_pos < 4) and (-0.9 * math.pi < new_theta < 0.9 * math.pi) and (0.5 < new_r < 2.5):
                 ## Sprawdź kolizję na końcową pozycję
                 #new_arm_pos = vector(new_r * math.cos(new_theta), new_z_pos + 0.5, new_r * math.sin(new_theta))
                 #if self.check_collision_with_sphere(new_arm_pos):
