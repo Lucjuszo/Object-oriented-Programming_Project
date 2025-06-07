@@ -19,7 +19,8 @@ velocity = 0.07
 
 class TargetObject:
     def __init__(self):
-        self.body = sphere(pos=vector(0, 0.2, 3), radius=0.2, color=color.red)
+        self.body = sphere(pos=vector(0, 0.4, 3), radius=0.4, color=color.red)
+        
 
     def set_position(self, pos):
         self.body.pos = pos
@@ -46,8 +47,8 @@ class CylindricalRobot:
 
         # Chwytak
         self.gripper_base = box(pos=vector(0, 0, 0), size=vector(0.1, 0.1, 1), color=color.black)
-        self.jaw_left = box(pos=vector(0, 0, 0), size=vector(0.35, 0.5, 0.02), color=color.black)
-        self.jaw_right = box(pos=vector(0, 0, 0), size=vector(0.35, 0.5, 0.02), color=color.black)
+        self.jaw_left = box(pos=vector(0, 0, 0), size=vector(0.35, 1, 0.02), color=color.black)
+        self.jaw_right = box(pos=vector(0, 0, 0), size=vector(0.35, 1, 0.02), color=color.black)
 
     def update(self):
         self.arm.pos = vector(self.r * math.cos(self.theta), self.z_pos + 0.5, self.r * math.sin(self.theta))
@@ -69,7 +70,7 @@ class CylindricalRobot:
         self.jaw_right.up = norm(self.arm.up)
 
         if self.grabbing:
-            # Ustaw pozycję przedmiotu na środku między szczękami
+            # Kluczowa zmiana: aktualizacja pozycji obiektu, aby podążał za szczękami
             new_pos = (self.jaw_left.pos + self.jaw_right.pos) / 2
             self.target.set_position(new_pos)
 
@@ -77,6 +78,7 @@ class CylindricalRobot:
         # Animate jaw_gap smoothly to target_gap without blocking event loop or using time.sleep
         while abs(self.jaw_gap - target_gap) > 0.005:
             rate(60)
+            time.sleep(velocity)
             if self.jaw_gap < target_gap:
                 self.jaw_gap = min(self.jaw_gap + step, target_gap)
             else:
@@ -84,17 +86,20 @@ class CylindricalRobot:
             self.update()
 
     def close_gripper(self):
-        self.animate_grip(0.05)  # Close jaws tightly
         jaw_vec = self.jaw_right.pos - self.jaw_left.pos
         jaw_dir = norm(jaw_vec)
         jaw_len = mag(jaw_vec)
         obj_vec = self.target.get_position() - self.jaw_left.pos
         proj_len = dot(obj_vec, jaw_dir)
         perp_dist = mag(obj_vec - proj_len * jaw_dir)
-        if 0 <= proj_len <= jaw_len and perp_dist < 0.15:
+
+        if 0 <= proj_len <= jaw_len and perp_dist < (self.target.body.radius + 0.05):
+            self.animate_grip(2*self.target.body.radius) 
             self.grabbing = True
         else:
+            self.animate_grip(0.2) 
             self.grabbing = False
+            
     def open_gripper(self):
         self.animate_grip(self.jaw_max_gap)
         self.grabbing = False
@@ -104,10 +109,40 @@ class CylindricalRobot:
         sphere_pos = self.target.get_position()
         sphere_radius = self.target.body.radius
 
-        dist = mag(position - sphere_pos)
+        grip_center = position + self.arm.up * (self.arm.size.y - self.gripper_base.size.y) / 2
+        dist = mag(grip_center - sphere_pos)
         # Margines bezpieczeństwa (np. promień ramienia + chwytaka)
-        safety_distance = sphere_radius + 0.105  # dostosuj wartość 0.5 w razie potrzeby
+        safety_distance = sphere_radius + 0.2
         return dist < safety_distance
+        
+        # #kolizja ramienia
+        # grip_center = position + self.arm.up * (self.arm.size.y - self.gripper_base.size.y) / 2
+        # dist = mag(grip_center - sphere_pos)
+        # safety_distance = sphere_radius + 0.2
+        # if dist < safety_distance:
+        #     return True
+
+        # # Sprawdź kolizję dla gripper_base
+        # gripper_base_pos = self.gripper_base.pos
+        # dist_gripper_base = mag(gripper_base_pos - sphere_pos)
+        # if dist_gripper_base < safety_distance:
+        #     return True
+
+        # # Sprawdź kolizję dla jaw_left
+        # jaw_left_pos = self.jaw_left.pos
+        # dist_jaw_left = mag(jaw_left_pos - sphere_pos)
+        # if dist_jaw_left < safety_distance:
+        #     return True
+
+        # # Sprawdź kolizję dla jaw_right
+        # jaw_right_pos = self.jaw_right.pos
+        # dist_jaw_right = mag(jaw_right_pos - sphere_pos)
+        # if dist_jaw_right < safety_distance:
+        #     return True
+
+        # return False
+
+
 
     def handle_input(self, key):
         # Zachowaj kopię bieżących parametrów
@@ -125,7 +160,7 @@ class CylindricalRobot:
         elif key == 'p': self.open_gripper()   # otwieraj szczęki
 
         # Ograniczenia parametrów
-        new_z_pos = max(0, min(new_z_pos, 4))
+        new_z_pos = max(-0.09, min(new_z_pos, 4))
         new_r = max(0.5, min(new_r, 2.5))
         new_theta = max(-0.9 * math.pi, min(new_theta, 0.9 * math.pi))
 
