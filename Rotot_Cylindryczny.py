@@ -1,6 +1,10 @@
 from vpython import *
 import math
 import time
+import pygame  
+
+pygame.mixer.init()
+move_sound = pygame.mixer.Sound("C:/Users/Użytkownik/Documents/Python/Object_Oriented_Programming_Project/sound_robot.wav")
 
 scene.title = "Robot cylindryczny"
 scene.caption = """Sterowanie:
@@ -20,7 +24,7 @@ class TargetObject:
     def __init__(self):
         self.body = sphere(pos=vector(0, 0.4, 3), radius=0.4, color=color.red)
         self.velocity = vector(0, 0, 0)  # Prędkość opadania
-        self.is_dropped = False  # Flaga informująca, czy obiekt został puszczony
+        self.is_dropped = False  
 
     def set_position(self, pos):
         self.body.pos = pos
@@ -30,23 +34,23 @@ class TargetObject:
 
     def update(self):
         if self.is_dropped:
-            # Dodaj grawitację
-            self.velocity.y -= 0.02  # Przyspieszenie grawitacyjne
-            self.body.pos += self.velocity  # Aktualizuj pozycję obiektu
+            # Grawitacja
+            self.velocity.y -= 0.02
+            self.body.pos += self.velocity  
 
-            # Sprawdź kolizję z podłogą
-            if self.body.pos.y <= 0.4:  # Zakładamy, że podłoga ma y = -1.5 i kula ma promień 0.4
-                self.body.pos.y = 0.4  # Ustaw pozycję na poziomie podłogi
-                self.velocity.y = 0  # Zatrzymaj obiekt
+            # Spadek na podłogę
+            if self.body.pos.y <= 0.4:  
+                self.body.pos.y = 0.4  
+                self.velocity.y = 0  
 
     def drop(self):
-        self.is_dropped = True  # Ustaw flagę, aby obiekt opadł
+        self.is_dropped = True  # obiekt opadł
         self.velocity = vector(0, 0, 0)  # Resetuj prędkość przy puszczeniu
 
-    def reset(self):
-        self.is_dropped = False  # Zresetuj flagę
-        self.velocity = vector(0, 0, 0)  # Zresetuj prędkość
-        self.body.pos.y = 0.4  # Ustaw pozycję na początkową
+    def reset(self):    #reset po upadku
+        self.is_dropped = False  
+        self.velocity = vector(0, 0, 0)  
+        self.body.pos.y = 0.4  
 
 
 class CylindricalRobot:
@@ -103,12 +107,10 @@ class CylindricalRobot:
         self.jaw_right.up = norm(self.arm.up)
 
         if self.grabbing:
-            # Kluczowa zmiana: aktualizacja pozycji obiektu, aby podążał za szczękami
             new_pos = (self.jaw_left.pos + self.jaw_right.pos) / 2
             self.target.set_position(new_pos)
 
     def animate_grip(self, target_gap, step=0.02):
-        # Animate jaw_gap smoothly to target_gap without blocking event loop or using time.sleep
         while abs(self.jaw_gap - target_gap) > 0.005:
             rate(60)
             time.sleep(time_delay)
@@ -136,22 +138,22 @@ class CylindricalRobot:
     def open_gripper(self):
         self.animate_grip(self.jaw_max_gap)
         self.grabbing = False
-        self.target.drop()  # Zainicjuj opadanie obiektu
-        self.target.reset()  # Resetuj stan obiektu po puszczeniu
+        self.target.drop()  # opadanie obiektu
+        self.target.reset()  # Reset po opadnięciu
 
     def check_collision_with_sphere(self, position):
         # Sprawdź odległość rdzenia ramienia od kuli (targetu)
         sphere_pos = self.target.get_position()
         sphere_radius = self.target.body.radius
 
-        # Oblicz pozycję rdzenia ramienia
+        # kolizja ramienia
         arm_base_pos = position  
         dist = mag(arm_base_pos - sphere_pos)  
         safety_distance = sphere_radius + 0.48
         if dist <= safety_distance:
             return True
 
-        #kolizja ramienia
+        #kolizja grip
         grip_center = position + self.arm.up * (self.arm.size.y - self.gripper_base.size.y) / 2
         dist_grip = mag(grip_center - sphere_pos)
         if  dist_grip <= sphere_radius:
@@ -177,10 +179,8 @@ class CylindricalRobot:
 
         return False
 
-
-
     def handle_input(self, key):
-        # Zachowaj kopię bieżących parametrów
+        # kopia bieżących parametrów
         new_theta = self.theta
         new_z_pos = self.z_pos
         new_r = self.r
@@ -189,16 +189,30 @@ class CylindricalRobot:
         old_pos = vector(self.r * math.cos(self.theta), self.z_pos + 0.5, self.r * math.sin(self.theta))
         old_dist = mag(old_pos - self.target.get_position())
 
-        if key == 'left': new_theta -= 0.02
-        elif key == 'right': new_theta += 0.02
-        elif key == 'up': new_z_pos += 0.02
-        elif key == 'down': new_z_pos -= 0.02
-        elif key == 'w': new_r += 0.02
-        elif key == 's': new_r -= 0.02
+        if key == 'left': 
+            new_theta -= 0.02
+            move_sound.play()
+        elif key == 'right': 
+            new_theta += 0.02
+            move_sound.play()
+        elif key == 'up': 
+            new_z_pos += 0.02
+            move_sound.play()
+        elif key == 'down': 
+            new_z_pos -= 0.02
+            move_sound.play()
+        elif key == 'w': 
+            new_r += 0.02
+            move_sound.play()
+        elif key == 's': 
+            new_r -= 0.02
+            move_sound.play()
         elif key == 'z': 
+            move_sound.play()
             self.close_gripper()  # zaciskaj szczęki
             self.if_gripped = 1
         elif key == 'p': 
+            move_sound.play()
             self.open_gripper()   # otwieraj szczęki
             self.if_gripped = 2
 
@@ -244,10 +258,8 @@ class CylindricalRobot:
             self.mache_play()
             return
 
-        # wykonaj ruch
         self.handle_input(key)
 
-        # jeśli nagrywasz, zapisz aktualną pozycję
         if self.recording:
             self.mache_learn()
 
@@ -264,11 +276,6 @@ class CylindricalRobot:
             new_theta = math.atan2(y, x)  # kąt theta
             new_r = sqrt(x * 2 + y * 2)  # promień
             if (0 < new_z_pos < 4) and (-0.9 * math.pi < new_theta < 0.9 * math.pi) and (0.5 < new_r < 2.5):
-                # # Sprawdź kolizję na końcową pozycję
-                # new_arm_pos = vector(new_r * math.cos(new_theta), new_z_pos + 0.5, new_r * math.sin(new_theta))
-                # if self.check_collision_with_sphere(new_arm_pos):
-                #    print("Pozycja w kolizji z kulą - ruch zablokowany")
-                #    return
 
                 while new_z_pos > self.z_pos:
                     self.z_pos += 0.02
@@ -339,17 +346,12 @@ class CylindricalRobot:
             print("Wspolrzedne poza obszarem pracy")
 
     def mache_learn(self):  
-        #self.handle_input(key)
-
         self.learn_z_pos.append(self.z_pos)
         self.learn_theta.append(self.theta)
         self.learn_r.append(self.r)
         self.learn_gripped.append(self.if_gripped)
 
     def mache_play(self):
-        print("Odtwarzanie zapisanych ruchów:")
-        for i, (r, theta, z) in enumerate(zip(self.learn_r, self.learn_theta, self.learn_z_pos)):
-            print(f"{i+1}: r = {r:.2f}, θ = {theta:.2f}, z = {z:.2f}, if = {self.if_gripped}")
         self.move_to_pos(self.learn_z_pos[0], self.learn_theta[0], self.learn_r[0])
 
         time.sleep(2 * time_delay)
@@ -364,8 +366,6 @@ class CylindricalRobot:
                 self.open_gripper()
             time.sleep(time_delay)
             
-
-    #po zapisanie wyczyść tablicę z zapisanymi ruchami
     def clear_moves(self):
         self.learn_r.clear()
         self.learn_theta.clear()
