@@ -41,6 +41,7 @@ class TargetObject:
 
     def drop(self):
         self.is_dropped = True  # Ustaw flagę, aby obiekt opadł
+        self.velocity = vector(0, 0, 0)  # Resetuj prędkość przy puszczeniu
 
     def reset(self):
         self.is_dropped = False  # Zresetuj flagę
@@ -135,6 +136,8 @@ class CylindricalRobot:
     def open_gripper(self):
         self.animate_grip(self.jaw_max_gap)
         self.grabbing = False
+        self.target.drop()  # Zainicjuj opadanie obiektu
+        self.target.reset()  # Resetuj stan obiektu po puszczeniu
 
     def check_collision_with_sphere(self, position):
         # Sprawdź odległość rdzenia ramienia od kuli (targetu)
@@ -197,7 +200,6 @@ class CylindricalRobot:
             self.if_gripped = 1
         elif key == 'p': 
             self.open_gripper()   # otwieraj szczęki
-            self.target.drop()  # Zainicjuj opadanie obiektu
             self.if_gripped = 2
 
         # Ograniczenia parametrów
